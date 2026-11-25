@@ -1513,6 +1513,19 @@
     });
   });
 
+  // duplicate every successful inquiry to Telegram via the Cloudflare Worker (silent: errors never reach the visitor)
+  const TELEGRAM_RELAY_URL = 'https://agsdoor-telegram.shevchenko-aleksandr03.workers.dev/';
+  function sendToTelegram(payload){
+    try {
+      fetch(TELEGRAM_RELAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(() => {});
+    } catch(e){}
+  }
+
   document.getElementById('inquiryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -1535,6 +1548,15 @@
     submitBtn.textContent = '...';
 
     try {
+      const fd = new FormData(form);
+      const tgPayload = {
+        name: fd.get('name'),
+        phone: fd.get('phone'),
+        email: fd.get('email'),
+        type: fd.get('type'),
+        message: fd.get('message'),
+        lang: currentLang
+      };
       const response = await fetch('https://formspree.io/f/mojorpao', {
         method: 'POST',
         headers: { 'Accept': 'application/json' },
@@ -1544,6 +1566,7 @@
       if (response.ok) {
         successMsg.classList.add('show');
         form.reset();
+        sendToTelegram(tgPayload);
         if (recaptchaReady()) grecaptcha.reset(recaptchaWidget);
         if (typeof gtag !== 'undefined') {
           gtag('event', 'generate_lead', {
